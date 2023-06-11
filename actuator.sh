@@ -5,7 +5,7 @@ GPIO_PIN2=92
 HTML_FILE="index.html"
 GITHUB_PAGES_REPO="https://github.com/tweaker109/occupation_status.git"
 GIT_USERNAME="tweaker109"
-GIT_EMAIL="tomhine@mailstack.com"
+GIT_EMAIL="tweaker109@github.com"
 
 # Read the current state of the GPIO pin
 read_pin_state() {
