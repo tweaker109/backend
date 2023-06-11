@@ -1,93 +1,48 @@
 #!/bin/bash
 
-GPIO_PIN1=91
-GPIO_PIN2=92
-HTML_FILE="index.html"
+# GPIO line numbers for motion detectors
+line1=91
+line2=92
+
+# Webpage file path
+webpage_file="index.html"
+
+# Previous state variables
+previous_state1=0
+previous_state2=0
+
+# Git configuration
 GITHUB_PAGES_REPO="https://github.com/tweaker109/occupation_status.git"
 GIT_USERNAME="tweaker109"
 GIT_EMAIL="tweaker109@github.com"
 
-# Read the current state of the GPIO pin
-read_pin_state() {
-  local pin=$1
-  cat /sys/class/gpio/gpio${pin}/value
-}
-
-# Modify the HTML file with the updated number
-update_webpage() {
-  local new_number=$1
-  sed -i "s/<div class=\"number\">[0-9]\+<\/div>/<div class=\"number\">${new_number}<\/div>/" "${HTML_FILE}"
-}
-
-# Initialize the GPIO pins
-for pin in ${GPIO_PIN1} ${GPIO_PIN2}; do
-  echo ${pin} > /sys/class/gpio/export
-  echo "in" > /sys/class/gpio/gpio${pin}/direction
-done
-
-# Read the initial states of the pins
-previous_state1=$(read_pin_state ${GPIO_PIN1})
-previous_state2=$(read_pin_state ${GPIO_PIN2})
-
-# Initial number
-number=0
-
-# Continuously monitor the pin states and update the webpage
+# Main loop to monitor motion detectors
 while true; do
-  current_state1=$(read_pin_state ${GPIO_PIN1})
-  current_state2=$(read_pin_state ${GPIO_PIN2})
+  # Read the current state of motion detector 1
+  current_state1=$(gpio read ${line1})
 
-  # If both motion detectors are triggered
-  if [[ "${current_state1}" == "1" && "${current_state2}" == "1" ]]; then
-    # Increase the number by 1
-    number=$((number + 1))
-    
-    # Update the webpage with the new number
-    update_webpage ${number}
-    
-    # Commit and push the changes to the GitHub Pages repository
-    cd "$(dirname "${HTML_FILE}")"
-    git config user.name "${GIT_USERNAME}"
-    git config user.email "${GIT_EMAIL}"
-    git add "${HTML_FILE}"
-    git commit -m "Update webpage with new number"
-    git push "${GITHUB_PAGES_REPO}"
-  
-  # If only motion detector on line 91 is triggered
-  elif [[ "${current_state1}" == "1" && "${current_state2}" == "0" ]]; then
-    # Decrease the number by 1
-    number=$((number - 1))
-    
-    # Update the webpage with the new number
-    update_webpage ${number}
-    
-    # Commit and push the changes to the GitHub Pages repository
-    cd "$(dirname "${HTML_FILE}")"
-    git config user.name "${GIT_USERNAME}"
-    git config user.email "${GIT_EMAIL}"
-    git add "${HTML_FILE}"
-    git commit -m "Update webpage with new number"
-    git push "${GITHUB_PAGES_REPO}"
-  
-  # If only motion detector on line 92 is triggered
-  elif [[ "${current_state1}" == "0" && "${current_state2}" == "1" ]]; then
-    # Increase the number by 1
-    number=$((number + 1))
-    
-    # Update the webpage with the new number
-    update_webpage ${number}
-    
-    # Commit and push the changes to the GitHub Pages repository
-    cd "$(dirname "${HTML_FILE}")"
-    git config user.name "${GIT_USERNAME}"
-    git config user.email "${GIT_EMAIL}"
-    git add "${HTML_FILE}"
-    git commit -m "Update webpage with new number"
-    git push "${GITHUB_PAGES_REPO}"
+  # Read the current state of motion detector 2
+  current_state2=$(gpio read ${line2})
+
+  # Check if the states of the motion detectors have changed
+  if [[ ${current_state1} -ne ${previous_state1} || ${current_state2} -ne ${previous_state2} ]]; then
+    # Increase or decrease the numeric value based on the order of motion detector triggers
+    if [[ ${current_state1} -eq 1 && ${current_state2} -eq 0 ]]; then
+      sed -i 's/<div class="number">[0-9]\+/<div class="number">INCREMENTED_VALUE/' ${webpage_file}
+    elif [[ ${current_state1} -eq 0 && ${current_state2} -eq 1 ]]; then
+      sed -i 's/<div class="number">[0-9]\+/<div class="number">DECREMENTED_VALUE/' ${webpage_file}
+    fi
+
+    # Commit and push changes to the GitHub Pages repository
+    git -C /github.com/tweaker109/occuption_status/ add ${webpage_file}
+    git -C /github.com/tweaker109/occuption_status/ commit -m "Update webpage"
+    git -C /github.com/tweaker109/occuption_status/ push origin master
+
+    # Update the previous state variables
+    previous_state1=${current_state1}
+    previous_state2=${current_state2}
   fi
-  
-  # Update the previous
-previous_state1=${current_state1}
-previous_state2=${current_state2}
-sleep 0.1
+
+  # Sleep for a short duration before checking again
+  sleep 0.1
 done
